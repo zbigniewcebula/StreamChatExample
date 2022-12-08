@@ -13,10 +13,10 @@ public class EmblemIcon : MonoBehaviour
 		{
 			try
 			{
-				image.sprite = icons[value];
-				iconID = value;
+				image.sprite = icons[value % icons.Length];
+				iconID = value % icons.Length;
 			}
-			catch (System.IndexOutOfRangeException)
+			catch(System.IndexOutOfRangeException)
 			{
 				throw new System.IndexOutOfRangeException(
 					$"EmblemIcon.SetIcon: id [{value}] out of range [{icons.Length}]"

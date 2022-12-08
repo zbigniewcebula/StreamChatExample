@@ -1,12 +1,8 @@
 using StreamChat.Core;
 using StreamChat.Core.LowLevelClient.Models;
-using StreamChat.Core.LowLevelClient.Requests;
-using StreamChat.Core.Models;
 using StreamChat.Core.Requests;
 using StreamChat.Core.StatefulModels;
-using System;
 using System.Collections;
-using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,7 +10,7 @@ using UnityEngine.UI;
 public class ChatPanel : MonoBehaviour
 {
 	//Static
-	public static ChannelState CurrentClan { get; private set; }
+	public static IStreamChannel CurrentClan { get; private set; }
 
 	//Accessor
 
@@ -75,21 +71,8 @@ public class ChatPanel : MonoBehaviour
 
 		state.MessageReceived += OnNewMessageAdded;
 
-		foreach(Message msg in state.Messages)
-		{
-			//Create message entry
-			var box = Instantiate(
-				msg.User.Id == StreamManager.Client.LocalUserData.UserId ?
-				currentUserMessageEntryPrefab : messageEntryPrefab,
-				messagesBoxParent
-			).GetComponent<ChatMessageBox>();
-
-			box.Message = msg.Text;
-			box.Author = msg.User.Name; //TODO: Username fetching
-			if(msg.CreatedAt != null)
-				box.CreationTime = msg.CreatedAt.Value;
-			//box.Rank = //TODO: User rank fetching
-		}
+		foreach(IStreamMessage msg in state.Messages)
+			OnNewMessageAdded(state, msg);
 	}
 
 	private void OnNewMessageAdded(IStreamChannel channel, IStreamMessage msg)
@@ -99,12 +82,35 @@ public class ChatPanel : MonoBehaviour
 			currentUserMessageEntryPrefab : messageEntryPrefab,
 			messagesBoxParent
 		).GetComponent<ChatMessageBox>();
+		box.Init(msg);
 
 		box.Message = msg.Text;
-		box.Author = msg.User.Name; //TODO: Username fetching
+		box.Author = msg.User.Id; //TODO: Username fetching
 		if(msg.CreatedAt != null)
 			box.CreationTime = msg.CreatedAt;
-		//box.Rank = //TODO: User rank fetching
+
+		if(msg.User.CustomData.ContainsKey("rank"))
+		{
+			string rank = msg.User.CustomData.Get<string>("rank");
+			if(!System.Enum.TryParse(rank, out MemberEntry.MemberEntryData.Rank temp))
+				box.Rank = temp;
+			else
+				box.Rank = MemberEntry.MemberEntryData.Rank.Member;
+		} else
+		{
+			box.Rank = MemberEntry.MemberEntryData.Rank.Member;
+			System.Collections.Generic.Dictionary<string, object> data = new()
+			{
+				{ "rank", MemberEntry.MemberEntryData.Rank.Member }
+			};
+			StreamManager.Client.UpsertUsers(new StreamUserUpsertRequest[] {
+				new()
+				{
+					Id = msg.User.Id,
+					CustomData = new StreamCustomDataRequest(data)
+				}
+			});
+		}
 	}
 
 	private void SendMessage()

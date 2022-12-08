@@ -2,8 +2,12 @@ using UnityEngine;
 using UnityEngine.UI;
 using Rank = MemberEntry.MemberEntryData.Rank;
 using DateTimeOffset = System.DateTimeOffset;
+using System.Collections.Generic;
+using StreamChat.Core.StatefulModels;
+using StreamChat.Core.Models;
+using UnityEngine.EventSystems;
 
-public class ChatMessageBox : MonoBehaviour
+public class ChatMessageBox : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
 	//Static
 
@@ -44,6 +48,9 @@ public class ChatMessageBox : MonoBehaviour
 	[SerializeField] private Text message = null;
 	[SerializeField] private Text timeSent = null;
 	[SerializeField] private Text rank = null;
+	[SerializeField] private RectTransform reactionsParent = null;
+	[SerializeField] private MessageReaction reactionPrefab = null;
+	[SerializeField] private ReactionsDB reactionsDB = null;
 
 	[Header("Settings"), Tooltip("Time in seconds")]
 	[SerializeField] private float refreshInterval = 60f;
@@ -54,7 +61,16 @@ public class ChatMessageBox : MonoBehaviour
 	private float nextRefresh = float.MinValue;
 	private DateTimeOffset createdBy;
 
+	private IStreamMessage msg;
+	private Dictionary<string, MessageReaction> reactions = new();
+
 	//Methods
+	private void Start()
+	{
+		for(int i = 0; i < reactionsDB.Count; ++i)
+			AddReaction(reactionsDB.reactions[i].name);
+	}
+
 	private void LateUpdate()
 	{
 		if(nextRefresh < Time.timeSinceLevelLoad)
@@ -62,6 +78,24 @@ public class ChatMessageBox : MonoBehaviour
 			UpdateTimeSent();
 			nextRefresh = Time.timeSinceLevelLoad + refreshInterval;
 		}
+	}
+
+	public void OnPointerEnter(PointerEventData eventData)
+	{
+		foreach(KeyValuePair<string, MessageReaction> pair in reactions)
+			pair.Value.Show();
+	}
+
+	public void OnPointerExit(PointerEventData eventData)
+	{
+		foreach(KeyValuePair<string, MessageReaction> pair in reactions)
+			if(pair.Value.Count <= 0)
+				pair.Value.Hide();
+	}
+
+	public void Init(IStreamMessage message)
+	{
+		msg = message;
 	}
 
 	private void UpdateTimeSent()
@@ -88,5 +122,27 @@ public class ChatMessageBox : MonoBehaviour
 			timeSent.text = $"{createdBy.Month}/{createdBy.Day}/{createdBy.Year} "
 				+ $"{createdBy.Hour}:{createdBy.Minute}";
 		}
+	}
+
+	public void AddReaction(string reactionID, int count = 0)
+	{
+		MessageReaction reactionUI;
+		if(!reactions.TryGetValue(reactionID, out reactionUI))
+		{
+			reactionUI = Instantiate(
+				reactionPrefab, reactionsParent
+			);
+			if(reactionUI.Init(reactionID, msg))
+				reactions.Add(reactionID, reactionUI);
+		}
+		reactionUI.Count += count;
+	}
+
+	public void RemoveReaction(string reactionID)
+	{
+		MessageReaction reactionUI;
+		if(reactions.TryGetValue(reactionID, out reactionUI))
+			if(reactionUI.Count >= 1)
+				reactionUI.Count -= 1;
 	}
 }

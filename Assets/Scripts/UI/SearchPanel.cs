@@ -34,21 +34,26 @@ public class SearchPanel : MonoBehaviour
 
 	[Header("Settings")]
 	[SerializeField] private int elementsPerPage = 30;
-	[SerializeField] private int offset = 0;
+	[SerializeField] private int initialOffset = 0;
 
 	//Events
 
 	//Private
 	private List<ClanEntry> entriesCache = new List<ClanEntry>();
 
-	private QueryChannelsRequest query = null;
-
 	private Task currentSearch = null;
 
 	private Task infiniteScroll = null;
 	private float lastInfRefresh = 0f;
 
+	private int offset = 0;
+
 	//Methods
+	private void Awake()
+	{
+		offset = initialOffset;
+	}
+
 	private IEnumerator Start()
 	{
 		while(StreamManager.Client.ConnectionState != ConnectionState.Connected)
@@ -65,90 +70,31 @@ public class SearchPanel : MonoBehaviour
 
 	private async Task InitialClanListAsync()
 	{
-		query = new QueryChannelsRequest
-		{
-			//Sort alphabetically by team name
-			Sort = new List<SortParamRequest>
-			{
-				new SortParamRequest
-				{
-					Field = "team",
-					Direction = SORT_ASC,
-				}
-			},
-
-			//Ignore hidden clans/channels
-			FilterConditions = new Dictionary<string, object>
-			{
-				{
-					"hidden", new Dictionary<string, object>
-					{
-						{ "$eq", false }
-					}
-				}
-			},
-
-			Limit = elementsPerPage,
-			Offset = offset,
-
-			//Tell server to not watch channel (avoiding unnecessay channel events)
-			Watch = false,
-			State = false,
-		};
-
 		SearchAsync();
 	}
 
 	public void Search()
 	{
 		//Clean offset for new search results
-		offset = 0;
+		initialOffset = 0;
 		//Hide advanced options
 		advancedSearchOptions.gameObject.SetActive(false);
 
-		query = new QueryChannelsRequest
+		Dictionary<string, object> filterParams = new Dictionary<string, object>()
 		{
-			//Sort alphabetically by team name
-			Sort = new List<SortParamRequest>
 			{
-				new SortParamRequest
+				"id", new Dictionary<string, object>
 				{
-					Field = advancedSearchOptions.FilterType,
-					Direction = advancedSearchOptions.SortDirection,
+					{ "$eq", $"clan_{searchingField.text}" }
 				}
-			},
-
-			//Ignore hidden clans/channels
-			FilterConditions = new Dictionary<string, object>
-			{
-				{
-					"hidden", new Dictionary<string, object>
-					{
-						{ "$eq", false }
-					}
-				}
-			},
-
-			Limit = elementsPerPage,
-			Offset = offset,
-
-			//Tell server to not watch channel (avoiding unnecessay channel events)
-			Watch = false,
-			State = false,
+			}
 		};
-
-		var filteringFunc = new Func<IEnumerable<IStreamChannel>, IEnumerable<IStreamChannel>>(
-			channels => channels
-		);
 
 		foreach(var entry in entriesCache)
 			Destroy(entry.gameObject);
 		entriesCache.Clear();
 
-		if(string.IsNullOrEmpty(searchingField.text))
-			currentSearch = SearchAsync();
-		else
-			currentSearch = SearchAsync(filteringFunc);
+		currentSearch = SearchAsync(filterParams: filterParams);
 	}
 
 	private void SearchInfiniteScroll()
@@ -163,13 +109,12 @@ public class SearchPanel : MonoBehaviour
 		{
 			int orgOffset = offset;
 			offset += elementsPerPage;
-			query.Offset = offset;
 			infiniteScroll = SearchAsync();
 
 			int currentEntriesCount = entriesCache.Count;
 			infiniteScroll.ContinueWith(t => {
 				if(currentEntriesCount == entriesCache.Count)
-					offset = orgOffset;
+					initialOffset = orgOffset;
 			});
 
 			lastInfRefresh = Time.timeSinceLevelLoad;
@@ -177,15 +122,13 @@ public class SearchPanel : MonoBehaviour
 	}
 
 	private async Task SearchAsync(
-		Func<IEnumerable<IStreamChannel>, IEnumerable<IStreamChannel>> filter = null
+		Func<IEnumerable<IStreamChannel>, IEnumerable<IStreamChannel>> filterFunc = null,
+		Dictionary<string, object> filterParams = null
 	)
 	{
-		if(query == null)
-			return;
-
-		//Response contains list of channel states that matched the query
-		var response = await StreamManager.Client.QueryChannelsAsync(
-			new Dictionary<string, object>
+		if(filterParams == null)
+		{
+			filterParams = new Dictionary<string, object>
 			{
 				{
 					"hidden", new Dictionary<string, object>
@@ -193,7 +136,12 @@ public class SearchPanel : MonoBehaviour
 						{ "$eq", false }
 					}
 				}
-			}
+			};
+		}
+
+		//Response contains list of channel states that matched the query
+		var response = await StreamManager.Client.QueryChannelsAsync(
+			filterParams, elementsPerPage, offset
 		);
 
 		int count = response.Count();
@@ -210,8 +158,8 @@ public class SearchPanel : MonoBehaviour
 		try
 		{
 			//Local filter of channels
-			if(filter != null)
-				response = filter.Invoke(response);
+			if(filterFunc != null)
+				response = filterFunc.Invoke(response);
 
 			//Iteration through recieved channels and creating new entries in UI
 			foreach(IStreamChannel channel in response)
