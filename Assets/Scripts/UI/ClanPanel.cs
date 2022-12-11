@@ -1,6 +1,8 @@
 using StreamChat.Core;
 using StreamChat.Core.StatefulModels;
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -32,11 +34,14 @@ public class ClanPanel : MonoBehaviour
 	[SerializeField] private RectTransform memberListParent = null;
 
 	[Header("Bindings/Prefabs")]
-	[SerializeField] private GameObject memberEntryPrefab = null;
+	[SerializeField] private MemberEntry memberEntryPrefab = null;
 
 	//Events
 
 	//Private
+	private IStreamChannel currentChannel = null;
+
+	private List<MemberEntry> pool = new();
 
 	//Methods
 	private IEnumerator Start()
@@ -52,40 +57,90 @@ public class ClanPanel : MonoBehaviour
 		leaveButton.onClick.AddListener(LeaveButtonClicked);
 	}
 
-	private async Task ClanInfoUpdate(string clanID)
+	private void OnMembersChanged(IStreamChannel chn, IStreamChannelMember member)
+	{
+		chn.QueryMembersEx().ContinueWith(t => {
+			RefreshMembers(t.Result);
+		});
+	}
+
+	private async Task ClanInfoUpdate(string clanID = null)
 	{
 		clanStateScreen.SetActive(false);
 		emptyStateScreen.SetActive(true);
 
-		if(CurrentPlayerCache.CurrentClan == null)
+		if(clanID == null)
 		{
-			Debug.Log($"[ClanPanel] Fetch current clan info...");
-			await CurrentPlayerCache.FetchCurrentClanAsync(
-				ShowClanInfo, () => {
-					errorStateScreen.SetActive(false);
-					Debug.Log($"[ClanPanel] Cannot find clanid: {CurrentPlayerCache.ClanID}");
-				}
-			);
+			await ShowClanInfo(CurrentPlayerCache.CurrentClan);
 		}
 		else
 		{
-			ShowClanInfo(CurrentPlayerCache.CurrentClan);
+			await ShowClanInfo(clanID);
 		}
 	}
 
-	public void ShowClanInfo(IStreamChannel channel)
+	public async Task ShowClanInfo(string clanID)
+	{
+		var channelResponse = await StreamManager.Client.QueryChannelsAsync(
+			new Dictionary<string, object>()
+			{
+				{
+					"id", clanID
+				}
+			}
+		);
+
+		var channel = channelResponse.FirstOrDefault(
+			chn => chn.Id == clanID
+		);
+		if(channel != null)
+			await ShowClanInfo(channel);
+	}
+
+	private void RegisterMemberEvents()
+	{
+		currentChannel.MemberAdded += OnMembersChanged;
+		currentChannel.MemberUpdated += OnMembersChanged;
+		currentChannel.MemberRemoved += OnMembersChanged;
+	}
+
+	private void UnregisterMemberEvents()
+	{
+		currentChannel.MemberAdded -= OnMembersChanged;
+		currentChannel.MemberUpdated -= OnMembersChanged;
+		currentChannel.MemberRemoved -= OnMembersChanged;
+	}
+
+	public async Task ShowClanInfo(IStreamChannel channel)
 	{
 		if(channel == null)
 		{
+			if(currentChannel != null)
+			{
+				UnregisterMemberEvents();
+			}
+			currentChannel = channel;
+
 			clanStateScreen.SetActive(false);
 			emptyStateScreen.SetActive(true);
 			return;
 		}
+		else if(currentChannel != null && channel.Id != currentChannel.Id)
+		{
+			UnregisterMemberEvents();
+			currentChannel = channel;
+			RegisterMemberEvents();
+		}
+		else
+			currentChannel = channel;
 
 		name.text = channel.CustomData.Get<string>("clanname");
 		description.text = channel.CustomData.Get<string>("description");
-		int membersOnline = channel.Members == null ?
-			0 : channel.Members.Where(
+
+		IEnumerable<IStreamChannelMember> membersList = await channel.QueryMembersEx();
+
+		int membersOnline = membersList == null ?
+			0 : membersList.Where(
 				m => m.User != null && m.User.Online
 			).Count();
 		members.text = $"{membersOnline}/{channel.MemberCount}";
@@ -101,48 +156,64 @@ public class ClanPanel : MonoBehaviour
 			Debug.LogException(ex);
 		}
 
-		if(channel.Members != null)
+		joinButton.gameObject.SetActive(true);
+		leaveButton.gameObject.SetActive(false);
+
+		if(membersList != null && membersList.Count() > 0)
 		{
-			foreach(IStreamUser member in channel.Members.Select(m => m.User))
+			if(membersList.Any(m =>
+				m.User.Id == StreamManager.Client.LocalUserData.UserId
+			))
 			{
-				GameObject go = Instantiate(memberEntryPrefab, memberListParent);
-				var memberEntry = go.GetComponent<MemberEntry>();
-
-				int pts = member.CustomData.Get<int>("points");
-				int emblem = member.CustomData.Get<int>("rankEmblem");
-				string rank = "Member";
-				if(member.CustomData.ContainsKey("rank"))
-					rank = member.CustomData.Get<string>("rank");
-
-				string name = "UnkownName";
-				if(member.CustomData.ContainsKey("name"))
-					name = member.CustomData.Get<string>("name");
-
-				memberEntry.SetData(new MemberEntry.MemberEntryData()
-				{
-					name = member.Id, //name
-					id = member.Id,
-					rank = rank,
-					points = pts,
-					rankEmblem = (MemberEntry.MemberEntryData.RankEmblem)emblem
-				});
-
-				go.transform.SetParent(memberListParent);
+				joinButton.gameObject.SetActive(false);
+				leaveButton.gameObject.SetActive(true);
 			}
+
+			RefreshMembers(membersList);
 		}
 		else
 		{
-			Debug.LogError("[ClanPanel] Members list is null");
+			Debug.LogError("[ClanPanel] Members list is null/empty");
 			errorStateScreen.SetActive(true);
 			return;
 		}
 
-		joinButton.gameObject.SetActive(false);
-		leaveButton.gameObject.SetActive(true);
-
 		emptyStateScreen.SetActive(false);
 		errorStateScreen.SetActive(false);
 		clanStateScreen.SetActive(true);
+	}
+
+	private void RefreshMembers(IEnumerable<IStreamChannelMember> membersList)
+	{
+		int count = membersList.Count();
+		if(count > pool.Count)
+		{
+			int diff = count - pool.Count;
+			for(int i = 0; i < diff; ++i)
+			{
+				MemberEntry memberEntry = Instantiate(
+					memberEntryPrefab, memberListParent
+				);
+				memberEntry.transform.SetParent(memberListParent);
+				pool.Add(memberEntry);
+			}
+		}
+		else if(count < pool.Count)
+		{
+			for(int i = 0; i < pool.Count; ++i)
+				pool[i].gameObject.SetActive(i < count);
+		}
+
+		int idx = 0;
+		try
+		{
+			foreach(IStreamUser member in membersList.Select(m => m.User))
+				pool[idx++].SetData(member);
+		}
+		catch(System.Exception ex)
+		{
+			Debug.LogException(ex);
+		}
 	}
 
 	private void JoinButtonClicked()
@@ -151,5 +222,20 @@ public class ClanPanel : MonoBehaviour
 
 	private void LeaveButtonClicked()
 	{
+		var user = CurrentPlayerCache.CurrentClan.Members.FirstOrDefault(
+			m => m.User.Id == StreamManager.Client.LocalUserData.UserId
+		);
+		if(user != null)
+		{
+			Task task = CurrentPlayerCache.CurrentClan.RemoveMembersAsync(user);
+			task.ContinueWith(t => CurrentPlayerCache.FetchCurrentClanAsync(
+				state => ClanInfoUpdate(state.Id)
+			));
+			return;
+		}
+
+		var refreshTask = CurrentPlayerCache.FetchCurrentClanAsync(
+			state => ClanInfoUpdate(state.Id)
+		);
 	}
 }

@@ -47,7 +47,9 @@ public class StreamManager : MonoBehaviour
 		instance = null;
 	}
 
-	private void Client_ConnectionStateChanged(ConnectionState oldState, ConnectionState newState)
+	private void Client_ConnectionStateChanged(
+		ConnectionState oldState, ConnectionState newState
+	)
 	{
 		if(newState == ConnectionState.Connected)
 			_ = CurrentPlayerCache.FetchCurrentClanAsync();

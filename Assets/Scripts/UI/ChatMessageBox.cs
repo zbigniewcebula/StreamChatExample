@@ -93,9 +93,18 @@ public class ChatMessageBox : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 				pair.Value.Hide();
 	}
 
+	private void OnReactionsUpdated(
+		IStreamChannel channel, IStreamMessage message, StreamReaction reaction
+	)
+	{
+		//refresh all reactions
+	}
+
 	public void Init(IStreamMessage message)
 	{
 		msg = message;
+
+		msg.ReactionUpdated += OnReactionsUpdated;
 	}
 
 	private void UpdateTimeSent()

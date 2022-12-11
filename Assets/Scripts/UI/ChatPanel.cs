@@ -96,7 +96,8 @@ public class ChatPanel : MonoBehaviour
 				box.Rank = temp;
 			else
 				box.Rank = MemberEntry.MemberEntryData.Rank.Member;
-		} else
+		}
+		else
 		{
 			box.Rank = MemberEntry.MemberEntryData.Rank.Member;
 			System.Collections.Generic.Dictionary<string, object> data = new()

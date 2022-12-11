@@ -55,11 +55,11 @@ public class MessageReaction : MonoBehaviour
 		Count = 0;
 		msg = message;
 
-		msg.ReactionAdded += OnReactionAdded;
-		msg.ReactionRemoved += OnReactionRemoved;
-
 		if(msg.ReactionScores.TryGetValue(reactionID, out int temp))
 			Count = temp;
+
+		msg.ReactionAdded += OnReactionAdded;
+		msg.ReactionRemoved += OnReactionRemoved;
 
 		button.onClick.AddListener(SendAddReaction);
 
@@ -68,14 +68,8 @@ public class MessageReaction : MonoBehaviour
 
 	private void SendAddReaction()
 	{
-		if(msg.OwnReactions.Count > 0)
-		{
-			foreach(var reaction in msg.OwnReactions)
-				msg.DeleteReactionAsync(reaction.Type);
-		}
-
-		msg.SendReactionAsync(
-			Icon.name, skipMobilePushNotifications: true
+		var task = msg.SendReactionAsync(
+			Icon.name, 1, true, true
 		);
 	}
 
