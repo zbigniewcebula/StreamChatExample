@@ -79,28 +79,26 @@ public static class CurrentPlayerCache
 	}
 
 	public static async Task FetchClanMembersAsync(
+		IStreamChannel channel,
 		Action<IEnumerable<IStreamChannelMember>> onComplete,
 		Action onFail = null
 	)
 	{
-		var memberResponse = await CurrentClan.QueryMembers(
-			new Dictionary<string, object>()
+		var memberResponse = await channel.QueryMembers(
+			new Dictionary<string, object>() {
+				{
+					"created_at", new Dictionary<string, object>
+					{
+						{ "$gt", "1970-01-01T00:00:01.00Z" }
+					}
+				}
+			}
 		);
-
-		//var memberResponse = await StreamManager.Client.QueryMembersAsync(
-		//	new QueryMembersRequest()
-		//	{
-		//		Id = CurrentClan.Channel.Id,
-		//		Type = "messaging",
-		//		FilterConditions = new Dictionary<string, object>(),
-		//		Sort = new List<SortParam> {
-		//			new SortParam { Field = "user_id" }
-		//		},
-		//		Limit = 10,
-		//		Offset = 0,
-		//	}
-		//);
 
 		onComplete.Invoke(memberResponse);
 	}
+	public static async Task FetchCurrentClanMembersAsync(
+		Action<IEnumerable<IStreamChannelMember>> onComplete,
+		Action onFail = null
+	) => await FetchClanMembersAsync(CurrentClan, onComplete, onFail);
 }

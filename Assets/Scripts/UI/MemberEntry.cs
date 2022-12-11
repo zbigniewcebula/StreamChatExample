@@ -1,3 +1,4 @@
+using StreamChat.Core.StatefulModels;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -34,6 +35,25 @@ public class MemberEntry : MonoBehaviour
 		rank.text = data.rank;
 		points.text = data.points.ToString();
 		rankEmblem.IconID = (int)data.rankEmblem;
+	}
+
+	public void SetData(IStreamUser member)
+	{
+		points.text = "0";
+		if(member.CustomData.ContainsKey("points"))
+			points.text = member.CustomData.Get<int>("points").ToString();
+
+		rankEmblem.IconID = 0;
+		if(member.CustomData.ContainsKey("rankEmblem"))
+			rankEmblem.IconID = member.CustomData.Get<int>("rankEmblem");
+		
+		rank.text = "Member";
+		if(member.CustomData.ContainsKey("rank"))
+			rank.text = member.CustomData.Get<string>("rank");
+
+		nameLabel.text = member.Id;
+		if(member.CustomData.ContainsKey("name"))
+			nameLabel.text = member.CustomData.Get<string>("name");
 	}
 
 #if UNITY_EDITOR

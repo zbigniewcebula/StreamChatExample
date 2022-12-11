@@ -4412,7 +4412,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 16}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &727088126
 MonoBehaviour:
@@ -6465,7 +6465,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1206775546
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10359,7 +10359,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1908281250
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10826,7 +10826,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   entryPrefab: {fileID: 6834503167023292149, guid: d02c6d5bc64b9fe46af16622dafc9193, type: 3}
   tabManager: {fileID: 890247872}
-  clanPanel: {fileID: 0}
+  clanPanel: {fileID: 1988360585}
   entriesContainer: {fileID: 1856062644}
   emptyStateScreen: {fileID: 1551828985}
   searchingField: {fileID: 828723109}
@@ -10858,7 +10858,7 @@ MonoBehaviour:
   joinButton: {fileID: 243985395}
   leaveButton: {fileID: 619834319}
   memberListParent: {fileID: 1898368263}
-  memberEntryPrefab: {fileID: 6834503167023292149, guid: 8f5fadf601ef93c468896346153b6eee, type: 3}
+  memberEntryPrefab: {fileID: -1741306308946101081, guid: 8f5fadf601ef93c468896346153b6eee, type: 3}
 --- !u!114 &1988360586
 MonoBehaviour:
   m_ObjectHideFlags: 0
