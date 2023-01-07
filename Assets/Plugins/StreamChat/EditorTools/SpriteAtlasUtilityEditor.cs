@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using StreamChat.Libs.Serialization;
@@ -132,5 +133,18 @@ namespace StreamChat.EditorTools
         private Object _jsonMapping;
         private string _error;
         private string _log;
+
+        private readonly struct GUIColorScope : IDisposable
+        {
+            public GUIColorScope(Color color)
+            {
+                _prev = GUI.color;
+                GUI.color = color;
+            }
+
+            public void Dispose() => GUI.color = _prev;
+
+            private readonly Color _prev;
+        }
     }
 }
