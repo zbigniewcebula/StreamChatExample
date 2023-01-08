@@ -1,7 +1,4 @@
 using StreamChat.Core;
-using StreamChat.Core.LowLevelClient.Models;
-using StreamChat.Core.LowLevelClient.Requests;
-using StreamChat.Core.Requests;
 using StreamChat.Core.StatefulModels;
 using System;
 using System.Collections;
@@ -59,9 +56,9 @@ public class SearchPanel : MonoBehaviour
 		while(StreamManager.Client.ConnectionState != ConnectionState.Connected)
 			yield return null;
 
-		InitialClanListAsync();
-
 		scroll.onValueChanged.AddListener(v => SearchInfiniteScroll());
+
+		InitialClanListAsync();
 	}
 
 	private void Update()
@@ -161,13 +158,18 @@ public class SearchPanel : MonoBehaviour
 			if(filterFunc != null)
 				response = filterFunc.Invoke(response);
 
+			string dbg = "";
+
 			//Iteration through recieved channels and creating new entries in UI
 			foreach(IStreamChannel channel in response)
 			{
 				GameObject go = Instantiate(entryPrefab, entriesContainer);
 				var entry = go.GetComponent<ClanEntry>();
 				entry.SetData(channel, Entry_OnShowProfile);
+
+				dbg += $"{channel.Id}, ";
 			}
+			Debug.Log($"[SearchPanel] Channels found: {dbg}");
 		}
 		catch(Exception ex)
 		{

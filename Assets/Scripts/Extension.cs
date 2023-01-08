@@ -7,6 +7,7 @@ public static class Extension
 {
 	public static void Invoke(this Button btn) => btn.onClick.Invoke();
 
+	[System.Obsolete]
 	public static async Task<IEnumerable<IStreamChannelMember>> QueryMembersEx(
 		this IStreamChannel channel
 	)

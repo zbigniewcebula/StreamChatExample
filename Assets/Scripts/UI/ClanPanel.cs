@@ -222,6 +222,23 @@ public class ClanPanel : MonoBehaviour
 
 	private void LeaveButtonClicked()
 	{
+		string id = CurrentPlayerCache.CurrentClan.Id;
+		CurrentPlayerCache.CurrentClan.RemoveMembersAsync(
+			new string[] { StreamManager.Client.LocalUserData.UserId }
+		).ContinueWith(t => {
+			if(t.IsFaulted)
+			{
+				Debug.LogError("[ClanPanel] Failed to leave clan");
+				if(t.Exception != null)
+					Debug.LogException(t.Exception);
+			}
+			else
+			{
+				Debug.Log("[ClanPanel] Left clan");
+				ClanInfoUpdate(id);
+			}
+		});
+		/*
 		var user = CurrentPlayerCache.CurrentClan.Members.FirstOrDefault(
 			m => m.User.Id == StreamManager.Client.LocalUserData.UserId
 		);
@@ -237,5 +254,6 @@ public class ClanPanel : MonoBehaviour
 		var refreshTask = CurrentPlayerCache.FetchCurrentClanAsync(
 			state => ClanInfoUpdate(state.Id)
 		);
+		*/
 	}
 }
