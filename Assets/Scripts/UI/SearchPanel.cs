@@ -1,4 +1,6 @@
 using StreamChat.Core;
+using StreamChat.Core.QueryBuilders.Filters;
+using StreamChat.Core.QueryBuilders.Filters.Channels;
 using StreamChat.Core.StatefulModels;
 using System;
 using System.Collections;
@@ -77,21 +79,16 @@ public class SearchPanel : MonoBehaviour
 		//Hide advanced options
 		advancedSearchOptions.gameObject.SetActive(false);
 
-		Dictionary<string, object> filterParams = new Dictionary<string, object>()
+		var filter = new IFieldFilterRule[]
 		{
-			{
-				"id", new Dictionary<string, object>
-				{
-					{ "$eq", $"clan_{searchingField.text}" }
-				}
-			}
+			ChannelFilter.Id.EqualsTo($"clan_{searchingField.text}")
 		};
 
 		foreach(var entry in entriesCache)
 			Destroy(entry.gameObject);
 		entriesCache.Clear();
 
-		currentSearch = SearchAsync(filterParams: filterParams);
+		currentSearch = SearchAsync(filter: filter);
 	}
 
 	private void SearchInfiniteScroll()
@@ -120,28 +117,22 @@ public class SearchPanel : MonoBehaviour
 
 	private async Task SearchAsync(
 		Func<IEnumerable<IStreamChannel>, IEnumerable<IStreamChannel>> filterFunc = null,
-		Dictionary<string, object> filterParams = null
+		IFieldFilterRule[] filter = null
 	)
 	{
-		if(filterParams == null)
+		if(filter == null)
 		{
-			filterParams = new Dictionary<string, object>
+			filter = new IFieldFilterRule[]
 			{
-				{
-					"hidden", new Dictionary<string, object>
-					{
-						{ "$eq", false }
-					}
-				}
+				ChannelFilter.Hidden.EqualsTo(false)
 			};
 		}
 
-		//Response contains list of channel states that matched the query
-		var response = await StreamManager.Client.QueryChannelsAsync(
-			filterParams, elementsPerPage, offset
+		var resp = await StreamManager.Client.QueryChannelsAsync(
+			filter, null, elementsPerPage, offset
 		);
 
-		int count = response.Count();
+		int count = resp.Count();
 		if(count == 0)
 		{
 			//Nothing found and list is empty
@@ -156,12 +147,12 @@ public class SearchPanel : MonoBehaviour
 		{
 			//Local filter of channels
 			if(filterFunc != null)
-				response = filterFunc.Invoke(response);
+				resp = filterFunc.Invoke(resp);
 
 			string dbg = "";
 
 			//Iteration through recieved channels and creating new entries in UI
-			foreach(IStreamChannel channel in response)
+			foreach(IStreamChannel channel in resp)
 			{
 				GameObject go = Instantiate(entryPrefab, entriesContainer);
 				var entry = go.GetComponent<ClanEntry>();

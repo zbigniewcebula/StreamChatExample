@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamChat.Core.LowLevelClient.Models;
 using StreamChat.Core.LowLevelClient.Requests;
+using StreamChat.Core.LowLevelClient.Responses;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.Video;
+using Random = UnityEngine.Random;
 
 namespace StreamChat.Tests.LowLevelClient.Integration
 {
@@ -125,7 +127,7 @@ namespace StreamChat.Tests.LowLevelClient.Integration
                 new ChannelGetOrCreateRequest
                 {
                     State = true,
-                    Messages = new MessagePaginationParamsRequest()
+                    Messages = new MessagePaginationParamsRequest
                     {
                         Limit = 30,
                         Offset = 0,
@@ -272,12 +274,12 @@ namespace StreamChat.Tests.LowLevelClient.Integration
             Assert.NotNull(imageFileContent);
             Assert.IsNotEmpty(imageFileContent);
 
-            const string ChannelType = "messaging";
+            const string channelType = "messaging";
 
-            var channelState = await CreateTempUniqueChannelAsync(ChannelType, new ChannelGetOrCreateRequest());
+            var channelState = await CreateTempUniqueChannelAsync(channelType, new ChannelGetOrCreateRequest());
             var channelId = channelState.Channel.Id;
 
-            var uploadImageResponse = await LowLevelClient.MessageApi.UploadImageAsync(ChannelType, channelId, imageFileContent, filename);
+            var uploadImageResponse = await LowLevelClient.MessageApi.UploadImageAsync(channelType, channelId, imageFileContent, filename);
             var fileUrl = uploadImageResponse.File;
 
             // Resize in scale mode to 500x500 pixels
@@ -299,7 +301,7 @@ namespace StreamChat.Tests.LowLevelClient.Integration
                 }
             };
 
-            var sendMessageResponse = await LowLevelClient.MessageApi.SendNewMessageAsync(ChannelType, channelId, sendMessageRequest);
+            var sendMessageResponse = await LowLevelClient.MessageApi.SendNewMessageAsync(channelType, channelId, sendMessageRequest);
             Assert.IsNotEmpty(sendMessageResponse.Message.Attachments);
 
             var imageUrl = sendMessageResponse.Message.Attachments[0].AssetUrl;
@@ -437,7 +439,11 @@ namespace StreamChat.Tests.LowLevelClient.Integration
         public IEnumerator SearchMessages()
         {
             yield return LowLevelClient.WaitForClientToConnect();
+            yield return SearchMessagesAsync().RunAsIEnumerator(lowLevelClient: LowLevelClient);
+        }
 
+        public async Task SearchMessagesAsync()
+        {
             var phrasesToInject = new string[]
             {
                 "bengal Cat",
@@ -448,13 +454,10 @@ namespace StreamChat.Tests.LowLevelClient.Integration
             var injectedMessageIds = new List<string>();
 
             const string channelType = "messaging";
-
-            ChannelState channelState = null;
-            yield return CreateTempUniqueChannel(channelType, new ChannelGetOrCreateRequest(),
-                state => channelState = state);
+            var channelState = await CreateTempUniqueChannelAsync(channelType, new ChannelGetOrCreateRequest());
             var channelId = channelState.Channel.Id;
 
-            var joinTask = LowLevelClient.ChannelApi.UpdateChannelAsync(channelState.Channel.Type, channelState.Channel.Id,
+            await LowLevelClient.ChannelApi.UpdateChannelAsync(channelState.Channel.Type, channelState.Channel.Id,
                 new UpdateChannelRequest
                 {
                     AddMembers = new List<ChannelMemberRequest>
@@ -465,8 +468,6 @@ namespace StreamChat.Tests.LowLevelClient.Integration
                         }
                     }
                 });
-
-            yield return joinTask.RunAsIEnumerator();
 
             //Generate 6 messages and inject search phrases to 3 of them
 
@@ -491,49 +492,91 @@ namespace StreamChat.Tests.LowLevelClient.Integration
                     }
                 };
 
-                var messageResponseTask =
-                    LowLevelClient.MessageApi.SendNewMessageAsync(channelType, channelId, sendMessageRequest);
-
-                yield return messageResponseTask.RunAsIEnumerator(response =>
+                var messageResponse = await LowLevelClient.MessageApi.SendNewMessageAsync(channelType, channelId, sendMessageRequest);
+                if (injectSearchPhrase)
                 {
-                    if (injectSearchPhrase)
-                    {
-                        injectedMessageIds.Add(response.Message.Id);
-                    }
-                });
+                    injectedMessageIds.Add(messageResponse.Message.Id);
+                }
             }
+
+            if (injectedMessageIds.Count != 3)
+            {
+                Debug.LogError("Failed to inject search phrase into 3 messages");
+            }
+            
+            Assert.AreEqual(3, injectedMessageIds.Count);
 
             //Search
 
-            var searchTask = LowLevelClient.MessageApi.SearchMessagesAsync(new SearchRequest
+            // Due to data propagation the results may not be instant
+            var attempt = 0;
+            const int MaxAttemps = 4;
+
+            SearchResponse response = null;
+            while (attempt < MaxAttemps)
             {
-                //Filter is required for search
-                FilterConditions = new Dictionary<string, object>
+                attempt++;
+                
+                response = await LowLevelClient.MessageApi.SearchMessagesAsync(new SearchRequest
                 {
+                    //Filter is required for search
+                    FilterConditions = new Dictionary<string, object>
                     {
-                        //Get channels that local user is a member of
-                        "members", new Dictionary<string, object>
                         {
-                            { "$in", new[] { LowLevelClient.UserId } }
+                            //Get channels that local user is a member of
+                            "members", new Dictionary<string, object>
+                            {
+                                { "$in", new[] { LowLevelClient.UserId } }
+                            }
                         }
-                    }
-                },
+                    },
+                    
+                    Sort = new List<SortParamRequest>
+                    {
+                        new SortParamRequest
+                        {
+                            Field = "created_at",
+                            Direction = -1
+                        }
+                    },
 
-                //search phrase
-                Query = "bengal"
-            });
-
-            yield return searchTask.RunAsIEnumerator(response =>
-            {
-                Assert.NotNull(response.Results);
-                Assert.AreEqual(3, response.Results.Count);
-
-                foreach (var injectedPhrase in phrasesToInject)
+                    //search phrase
+                    Query = "bengal"
+                });
+            
+                // Due to data propagation the results may not be instant
+                if (response.Results.Count(r => r.Message.Channel.Cid == channelState.Channel.Cid) != 3)
                 {
-                    var result = response.Results.FirstOrDefault(_ => _.Message.Text.Contains(injectedPhrase));
-                    Assert.NotNull(result);
+                    for (int i = 0; i < 50; i++)
+                    {
+                        LowLevelClient.Update(0.1f);
+                        await Task.Delay(1);
+                    }
+                    continue;
                 }
-            });
+
+                break;
+            }
+            
+            Assert.NotNull(response);
+            Assert.NotNull(response.Results);
+
+            if (response.Results.Count(r => r.Message.Channel.Cid == channelState.Channel.Cid) > 3)
+            {
+                Debug.Log("Error: Search returned more results than expected. Listing found messages:");
+                foreach (var message in response.Results)
+                {
+                    Debug.Log($"{message.Message.Channel.Cid} - {message.Message.Text}");
+                }
+            }
+
+            Assert.AreEqual(3, response.Results.Count(r => r.Message.Channel.Cid == channelState.Channel.Cid));
+
+            foreach (var injectedPhrase in phrasesToInject)
+            {
+                var result = response.Results.FirstOrDefault(_ => _.Message.Text.Contains(injectedPhrase));
+                Assert.NotNull(result);
+            }
         }
     }
 }

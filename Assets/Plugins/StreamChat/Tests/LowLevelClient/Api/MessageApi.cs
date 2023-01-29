@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Net.Http;
 using NSubstitute;
 using NUnit.Framework;
 using StreamChat.Core.Configs;
@@ -56,24 +57,34 @@ namespace StreamChat.Tests.LowLevelClient.Api
         {
             _lowLevelClient.Connect();
 
+            var response = new HttpResponse(true, 200, "{\"reaction\": {\"type\": \"like\"}}");
+
+            _mockHttpClient.SendHttpRequestAsync(Arg.Is(HttpMethodType.Post),Arg.Any<Uri>(), Arg.Any<object>())
+                .Returns(response);
+
             testCase.ExecuteRequest(_lowLevelClient);
 
             Expression<Predicate<Uri>> ValidateUri = uri => testCase.IsUriValid(uri);
-            Expression<Predicate<string>> ValidateRequestBody = request => testCase.IsRequestBodyValid(request);
+            Expression<Predicate<object>> ValidateRequestBody = request => testCase.IsRequestBodyValid(request as string);
 
-            _mockHttpClient.Received().PostAsync(Arg.Is(ValidateUri), Arg.Is(ValidateRequestBody));
+            _mockHttpClient.Received().SendHttpRequestAsync(Arg.Is(HttpMethodType.Post),Arg.Is(ValidateUri), Arg.Is(ValidateRequestBody));
         }
 
         [TestCaseSource(nameof(GetDeleteTestCases))]
         public void when_client_delete_request_expect_valid_uri_in_http_client(EndpointTestCaseBase testCase)
         {
             _lowLevelClient.Connect();
+            
+            var response = new HttpResponse(true, 200, "{\"reaction\": {\"type\": \"like\"}}");
+
+            _mockHttpClient.SendHttpRequestAsync(Arg.Is(HttpMethodType.Post),Arg.Any<Uri>(), Arg.Any<HttpContent>())
+                .Returns(response);
 
             testCase.ExecuteRequest(_lowLevelClient);
 
             Expression<Predicate<Uri>> ValidateUri = uri => testCase.IsUriValid(uri);
 
-            _mockHttpClient.Received().DeleteAsync(Arg.Is(ValidateUri));
+            _mockHttpClient.Received().SendHttpRequestAsync(Arg.Is(HttpMethodType.Delete), Arg.Is(ValidateUri), Arg.Any<object>());
         }
 
         private IStreamChatLowLevelClient _lowLevelClient;
