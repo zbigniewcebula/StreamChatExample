@@ -10,7 +10,7 @@ public static class CurrentPlayerCache
 {
 	public static string ClanID => CurrentClan == null ?
 		string.Empty : CurrentClan.Id;
-	public static IStreamChannel CurrentClan { get; private set; }
+	public static IStreamChannel CurrentClan { get; set; }
 
 	public static async Task FetchCurrentClanAsync(
 		Action<IStreamChannel> onComplete = null,

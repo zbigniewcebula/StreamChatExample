@@ -39,6 +39,7 @@ public class SearchPanel : MonoBehaviour
 	//Events
 
 	//Private
+	[SerializeField]
 	private List<ClanEntry> entriesCache = new List<ClanEntry>();
 
 	private Task currentSearch = null;
@@ -46,12 +47,12 @@ public class SearchPanel : MonoBehaviour
 	private Task infiniteScroll = null;
 	private float lastInfRefresh = 0f;
 
-	private int offset = 0;
+	private int currentOffset = 0;
 
 	//Methods
 	private void Awake()
 	{
-		offset = initialOffset;
+		currentOffset = initialOffset;
 	}
 
 	private IEnumerator Start()
@@ -102,9 +103,12 @@ public class SearchPanel : MonoBehaviour
 		&& (Time.timeSinceLevelLoad - lastInfRefresh) > 0.5f
 		)
 		{
-			int orgOffset = offset;
-			offset += elementsPerPage;
-			infiniteScroll = SearchAsync();
+			Debug.Log("Inf scroll");
+			int orgOffset = currentOffset;
+			currentOffset += elementsPerPage;
+			infiniteScroll = SearchAsync(
+				offset: currentOffset, limit: elementsPerPage
+			);
 
 			int currentEntriesCount = entriesCache.Count;
 			infiniteScroll.ContinueWith(t => {
@@ -118,7 +122,9 @@ public class SearchPanel : MonoBehaviour
 
 	private async Task SearchAsync(
 		Func<IEnumerable<IStreamChannel>, IEnumerable<IStreamChannel>> filterFunc = null,
-		IFieldFilterRule[] filter = null
+		IFieldFilterRule[] filter = null,
+		int offset = 0,
+		int limit = 30
 	)
 	{
 		if(filter == null)
@@ -129,11 +135,10 @@ public class SearchPanel : MonoBehaviour
 			};
 		}
 
-		Debug.Log($"{elementsPerPage} {offset}");
 		var resp = await StreamManager.Client.QueryChannelsAsync(
 			filter,
 			ChannelSort.OrderByAscending(ChannelSortFieldName.CreatedAt),
-			elementsPerPage, offset
+			limit, offset
 		);
 
 		int count = resp.Count();
@@ -158,10 +163,14 @@ public class SearchPanel : MonoBehaviour
 			//Iteration through recieved channels and creating new entries in UI
 			foreach(IStreamChannel channel in resp)
 			{
+				if(entriesCache.Any(e => e.Channel.Id == channel.Id))
+					continue;
+
 				GameObject go = Instantiate(entryPrefab, entriesContainer);
 				var entry = go.GetComponent<ClanEntry>();
 				entry.SetData(channel, Entry_OnShowProfile);
 
+				entriesCache.Add(entry);
 				dbg += $"{channel.Id}, ";
 			}
 			Debug.Log($"[SearchPanel] Channels found: {dbg}");

@@ -40,7 +40,10 @@ public class ClanEntry : MonoBehaviour
 		Channel = channel;
 		Refresh();
 
+		showClanBtn.onClick.RemoveAllListeners();
+		showClanBtn.onClick.AddListener(ShowClanProfile);
 		OnShowProfile += onShowProfile;
+
 		channel.Updated += InternalRefresh;
 	}
 
