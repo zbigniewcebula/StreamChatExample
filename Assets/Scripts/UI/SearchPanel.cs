@@ -2,6 +2,7 @@ using StreamChat.Core;
 using StreamChat.Core.QueryBuilders.Filters;
 using StreamChat.Core.QueryBuilders.Filters.Channels;
 using StreamChat.Core.StatefulModels;
+using StreamChat.Core.QueryBuilders.Sort;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -128,8 +129,11 @@ public class SearchPanel : MonoBehaviour
 			};
 		}
 
+		Debug.Log($"{elementsPerPage} {offset}");
 		var resp = await StreamManager.Client.QueryChannelsAsync(
-			filter, null, elementsPerPage, offset
+			filter,
+			ChannelSort.OrderByAscending(ChannelSortFieldName.CreatedAt),
+			elementsPerPage, offset
 		);
 
 		int count = resp.Count();
