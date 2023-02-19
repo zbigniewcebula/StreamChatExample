@@ -58,6 +58,9 @@ namespace StreamChat.Core
         public event ConnectionChangeHandler ConnectionStateChanged;
 
         public event ChannelDeleteHandler ChannelDeleted;
+        
+        public const int QueryUsersLimitMaxValue = 30;
+        public const int QueryUsersOffsetMaxValue = 1000;
 
         public ConnectionState ConnectionState => InternalLowLevelClient.ConnectionState;
 
@@ -256,10 +259,10 @@ namespace StreamChat.Core
             var requestBodyDto = new QueryChannelsRequestInternalDTO
             {
                 FilterConditions = filters?.Select(_ => _.GenerateFilterEntry()).ToDictionary(x => x.Key, x => x.Value),
-                Limit = null,
+                Limit = limit,
                 MemberLimit = null,
                 MessageLimit = null,
-                Offset = null,
+                Offset = offset,
                 Presence = true,
 
                 /*
@@ -300,10 +303,10 @@ namespace StreamChat.Core
             var requestBodyDto = new QueryChannelsRequestInternalDTO
             {
                 FilterConditions = filters?.ToDictionary(x => x.Key, x => x.Value),
-                Limit = null,
+                Limit = limit,
                 MemberLimit = null,
                 MessageLimit = null,
-                Offset = null,
+                Offset = offset,
                 Presence = true,
 
                 /*
@@ -332,6 +335,8 @@ namespace StreamChat.Core
             return result;
         }
 
+        [Obsolete("This method will be removed in the future. Please use the other overload method that uses " +
+                  nameof(IFieldFilterRule) + " type filters")]
         public async Task<IEnumerable<IStreamUser>> QueryUsersAsync(IDictionary<string, object> filters = null)
         {
             //StreamTodo: Missing filter, and stuff like IdGte etc
@@ -346,6 +351,40 @@ namespace StreamChat.Core
                 Offset = null,
                 Presence = true, //StreamTodo: research whether user should be allowed to control this
                 Sort = null,
+            };
+
+            var response = await InternalLowLevelClient.InternalUserApi.QueryUsersAsync(requestBodyDto);
+            if (response == null || response.Users == null || response.Users.Count == 0)
+            {
+                return Enumerable.Empty<IStreamUser>();
+            }
+
+            var result = new List<IStreamUser>();
+            foreach (var userDto in response.Users)
+            {
+                result.Add(_cache.TryCreateOrUpdate(userDto));
+            }
+
+            return result;
+        }
+
+        public async Task<IEnumerable<IStreamUser>> QueryUsersAsync(IEnumerable<IFieldFilterRule> filters = null, UsersSortObject sort = null, int offset = 0, int limit = 30)
+        {
+            StreamAsserts.AssertWithinRange(limit, 0, QueryUsersLimitMaxValue, nameof(limit));
+            StreamAsserts.AssertWithinRange(offset, 0, QueryUsersOffsetMaxValue, nameof(offset));
+            
+            //StreamTodo: Missing filter, and stuff like IdGte etc
+            var requestBodyDto = new QueryUsersRequestInternalDTO
+            {
+                FilterConditions = filters?.Select(_ => _.GenerateFilterEntry()).ToDictionary(x => x.Key, x => x.Value) ?? new Dictionary<string, object>(),
+                IdGt = null,
+                IdGte = null,
+                IdLt = null,
+                IdLte = null,
+                Limit = limit,
+                Offset = offset,
+                Presence = true, //StreamTodo: research whether user should be allowed to control this
+                Sort = sort?.ToSortParamInternalDTOs(),
             };
 
             var response = await InternalLowLevelClient.InternalUserApi.QueryUsersAsync(requestBodyDto);

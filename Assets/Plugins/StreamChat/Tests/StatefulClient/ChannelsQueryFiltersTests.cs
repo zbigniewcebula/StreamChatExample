@@ -1,19 +1,20 @@
 ﻿#if STREAM_TESTS_ENABLED
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using StreamChat.Core;
 using StreamChat.Core.QueryBuilders.Filters;
 using StreamChat.Core.QueryBuilders.Filters.Channels;
 using StreamChat.Core.QueryBuilders.Sort;
-using StreamChat.Core.StatefulModels;
 using UnityEngine.TestTools;
 
 namespace StreamChat.Tests.StatefulClient
 {
     /// <summary>
-    /// Tests operations executed on <see cref="StreamChannel"/>
+    /// Filter tests for <see cref="IStreamChatClient.QueryChannelsAsync"/>
     /// </summary>
     internal class ChannelsQueryFiltersTests : BaseStateIntegrationTests
     {
@@ -202,6 +203,27 @@ namespace StreamChat.Tests.StatefulClient
             Assert.IsNull(channels.FirstOrDefault(c => c == channel3));
             
             Assert.IsTrue(channels.All(c => c.MemberCount == 3));
+        }
+        
+        [UnityTest]
+        public IEnumerator When_query_channel_by_created_at_filter_expect_valid_results()
+            => ConnectAndExecute(When_query_channel_by_created_at_filter_expect_valid_results_Async);
+
+        private async Task When_query_channel_by_created_at_filter_expect_valid_results_Async()
+        {
+            var channel1 = await CreateUniqueTempChannelAsync();
+            var channel2 = await CreateUniqueTempChannelAsync();
+            var channel3 = await CreateUniqueTempChannelAsync();
+
+            var filters = new IFieldFilterRule[]
+            {
+                ChannelFilter.CreatedAt.GreaterThanOrEquals(DateTime.Now.AddMinutes(-5)),
+            };
+
+            var channels = (await Client.QueryChannelsAsync(filters, _sortByCreatedAtAscending)).ToArray();
+            Assert.Contains(channel1, channels);
+            Assert.Contains(channel2, channels); 
+            Assert.Contains(channel3, channels);
         }
 
         private readonly ChannelSortObject _sortByCreatedAtAscending

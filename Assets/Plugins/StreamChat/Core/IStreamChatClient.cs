@@ -172,7 +172,16 @@ namespace StreamChat.Core
         /// </summary>
         /// <param name="filters">[Optional] filter object</param>
         /// <returns></returns>
+        [Obsolete("This method will be removed in the future. Please use the other overload method that uses " +
+                  nameof(IFieldFilterRule) + " type filters")]
         Task<IEnumerable<IStreamUser>> QueryUsersAsync(IDictionary<string, object> filters = null);
+        
+        /// <summary>
+        /// Query <see cref="IStreamUser"/>
+        /// </summary>
+        /// <param name="filters">[Optional] filter rules</param>
+        /// <returns></returns>
+        Task<IEnumerable<IStreamUser>> QueryUsersAsync(IEnumerable<IFieldFilterRule> filters = null, UsersSortObject sort = null, int offset = 0, int limit = 30);
 
         /// <summary>
         /// Query banned users based on provided parameters
@@ -184,8 +193,7 @@ namespace StreamChat.Core
         /// <summary>
         /// Upsert users. Upsert means update this user or create if not found
         /// </summary>
-        /// <param name="userRequests"></param>
-        /// <returns></returns>
+        /// <param name="userRequests">Collection of user upsert requests</param>
         Task<IEnumerable<IStreamUser>> UpsertUsers(IEnumerable<StreamUserUpsertRequest> userRequests);
 
         /// <summary>

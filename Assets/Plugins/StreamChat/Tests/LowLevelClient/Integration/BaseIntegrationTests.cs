@@ -10,7 +10,6 @@ using StreamChat.Core.LowLevelClient;
 using StreamChat.Core.LowLevelClient.Models;
 using StreamChat.Core.LowLevelClient.Requests;
 using StreamChat.Core.LowLevelClient.Responses;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 using Random = UnityEngine.Random;
@@ -27,7 +26,7 @@ namespace StreamChat.Tests.LowLevelClient.Integration
         {
             Debug.Log("------------ Up");
 
-            InitClientAndConnect();
+            StreamTestClients.Instance.AddLock(this);
         }
 
         [OneTimeTearDown]
@@ -36,21 +35,20 @@ namespace StreamChat.Tests.LowLevelClient.Integration
             Debug.Log("------------ TearDown");
 
             await DeleteTempChannelsAsync();
-            TryCleanupClient();
+            await StreamTestClients.Instance.RemoveLockAsync(this);
         }
 
-        protected const string TestUserId = TestUtils.TestUserId;
-        protected const string TestAdminId = TestUtils.TestAdminId;
-        protected const string TestGuestId = TestUtils.TestGuestId;
-
-        protected IStreamChatLowLevelClient LowLevelClient { get; private set; }
-        protected OwnUser InitialLocalUser;
+        protected static IStreamChatLowLevelClient LowLevelClient => StreamTestClients.Instance.LowLevelClient;
 
         /// <summary>
         /// Id of other user than currently logged one
         /// </summary>
-        protected string OtherUserId { get; private set; }
+        protected static string OtherUserId => StreamTestClients.Instance.OtherUserId;
         
+        protected static OwnUser LowLevelClientOwnUser => StreamTestClients.Instance.LowLevelClientOwnUser;
+
+        protected static IEnumerator ReconnectClient() => StreamTestClients.Instance.ReconnectLowLevelClientClient();
+
         protected IEnumerator RunTest(Func<Task> task)
         {
             yield return LowLevelClient.WaitForClientToConnect();
@@ -65,10 +63,7 @@ namespace StreamChat.Tests.LowLevelClient.Integration
         {
             var createChannelTask = CreateTempUniqueChannelAsync(channelType, channelGetOrCreateRequest);
 
-            yield return createChannelTask.RunAsIEnumerator(response =>
-            {
-                onChannelReturned?.Invoke(response);
-            });
+            yield return createChannelTask.RunAsIEnumerator(response => { onChannelReturned?.Invoke(response); });
         }
 
         /// <summary>
@@ -98,22 +93,26 @@ namespace StreamChat.Tests.LowLevelClient.Integration
             }
 
             var channelState
-                = await LowLevelClient.ChannelApi.GetOrCreateChannelAsync(channelType, channelId, channelGetOrCreateRequest);
+                = await LowLevelClient.ChannelApi.GetOrCreateChannelAsync(channelType, channelId,
+                    channelGetOrCreateRequest);
             _tempChannelsCidsToDelete.Add(channelState.Channel.Cid);
             return channelState;
         }
 
-        protected void RemoveTempChannelFromDeleteList(string channelCid) => _tempChannelsCidsToDelete.Remove(channelCid);
-        
-        protected static async Task<T> Try<T>(Func<Task<T>> task, Predicate<T> successCondition, int maxAttempts = 5,
-            int msBetweenAttempts = 150)
+        protected void RemoveTempChannelFromDeleteList(string channelCid)
+            => _tempChannelsCidsToDelete.Remove(channelCid);
+
+        /// <summary>
+        /// Timeout will be doubled on each subsequent attempt. So max timeout = <see cref="initTimeoutMs"/> * 2^<see cref="maxAttempts"/>
+        /// </summary>
+        protected static async Task<T> Try<T>(Func<Task<T>> task, Predicate<T> successCondition, int maxAttempts = 20,
+            int initTimeoutMs = 150)
         {
             var response = default(T);
-            
-            while (maxAttempts > 0)
-            {
-                maxAttempts--;
 
+            var attemptsLeft = maxAttempts;
+            while (attemptsLeft > 0)
+            {
                 response = await task();
 
                 if (successCondition(response))
@@ -121,25 +120,12 @@ namespace StreamChat.Tests.LowLevelClient.Integration
                     return response;
                 }
 
-                await Task.Delay(msBetweenAttempts);
+                var delay = initTimeoutMs * Math.Pow(2, (maxAttempts - attemptsLeft));
+                await Task.Delay((int)delay);
+                attemptsLeft--;
             }
 
             return response;
-        }
-
-        protected IEnumerator InternalWaitForSeconds(float seconds)
-        {
-            if (seconds <= 0)
-            {
-                yield break;
-            }
-
-            var currentTime = EditorApplication.timeSinceStartup;
-
-            while ((EditorApplication.timeSinceStartup - currentTime) < seconds)
-            {
-                yield return null;
-            }
         }
 
         protected IEnumerator SendTestMessages(ChannelState channelState, int count,
@@ -250,57 +236,19 @@ namespace StreamChat.Tests.LowLevelClient.Integration
             }
             catch (StreamApiException streamApiException)
             {
-                if (streamApiException.Code == StreamApiException.RateLimitErrorErrorCode)
+                if (streamApiException.Code == StreamApiException.RateLimitErrorHttpStatusCode)
                 {
                     await Task.Delay(500);
                 }
-                
+
                 await LowLevelClient.ChannelApi.DeleteChannelsAsync(new DeleteChannelsRequest
                 {
                     Cids = _tempChannelsCidsToDelete,
                     HardDelete = true
                 });
             }
-            
+
             _tempChannelsCidsToDelete.Clear();
-        }
-
-        private void InitClientAndConnect(string forcedAdminId = null)
-        {
-            TestUtils.GetTestAuthCredentials(out var guestAuthCredentials, out var userAuthCredentials,
-                out var adminAuthCredentials, out var otherUserAuthCredentials, forcedAdminId);
-
-            OtherUserId = otherUserAuthCredentials.UserId;
-
-            LowLevelClient = StreamChatLowLevelClient.CreateDefaultClient(adminAuthCredentials);
-            LowLevelClient.Connected += OnClientConnected;
-            LowLevelClient.Connect();
-        }
-
-        private void TryCleanupClient()
-        {
-            if (LowLevelClient == null)
-            {
-                return;
-            }
-
-            LowLevelClient.Connected -= OnClientConnected;
-            LowLevelClient.Dispose();
-            LowLevelClient = null;
-        }
-
-        private void OnClientConnected(OwnUser localUser)
-        {
-            InitialLocalUser = localUser;
-        }
-
-        protected IEnumerator ReconnectClient()
-        {
-            var userId = LowLevelClient.UserId;
-            TryCleanupClient();
-            InitClientAndConnect(userId);
-
-            yield return LowLevelClient.WaitForClientToConnect();
         }
     }
 }

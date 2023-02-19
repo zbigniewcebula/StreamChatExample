@@ -29,6 +29,12 @@ namespace StreamChat.SampleProject.Views
         {
             base.OnUpdate();
 
+            if (_scrollRect.content.rect.height < _scrollRect.viewport.rect.height)
+            {
+                // if scroll view doesn't fill whole screen the verticalNormalizedPosition is 1 so it calls for previous messages on empty message list
+                return;
+            }
+
             if (_scrollRect.verticalNormalizedPosition >= 1f && !IsScrollListRebuilding)
             {
                 TryLoadPreviousMessagesAsync().LogIfFailed();
@@ -45,6 +51,7 @@ namespace StreamChat.SampleProject.Views
         }
 
         private readonly List<MessageView> _messages = new List<MessageView>();
+        private readonly UnityImageWebLoader _imageLoader = new UnityImageWebLoader();
 
         [SerializeField]
         private Transform _messagesContainer;
@@ -109,7 +116,7 @@ namespace StreamChat.SampleProject.Views
             => RebuildMessages(channel, scrollToBottom: false);
 
         private void OnMessageReceived(IStreamChannel channel, IStreamMessage message)
-            => RebuildMessages(channel, scrollToBottom: false);
+            => RebuildMessages(channel, scrollToBottom: true);
 
         private void ClearAll()
         {
@@ -125,11 +132,10 @@ namespace StreamChat.SampleProject.Views
         {
             ClearAll();
 
-            var imageLoader = new UnityImageWebLoader();
             foreach (var message in channel.Messages)
             {
                 var messageView = CreateMessageView(message);
-                messageView.UpdateData(message, imageLoader);
+                messageView.UpdateData(message, _imageLoader);
                 _messages.Add(messageView);
 
                 if (message == channel.Messages.Last())
