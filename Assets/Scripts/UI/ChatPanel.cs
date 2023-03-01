@@ -119,14 +119,13 @@ public class ChatPanel : MonoBehaviour
 		if(!chatStateScreen.activeSelf)
 			return;
 
-		SendMessageAsync(messageTextField.text);
+		_ = SendMessageAsync(messageTextField.text);
+		messageTextField.text = string.Empty;
 	}
 
 	private async Task SendMessageAsync(string msg)
 	{
 		var response = await CurrentPlayerCache.CurrentClan
 			.SendNewMessageAsync(msg);
-
-		//if(response)
 	}
 }

@@ -212,7 +212,11 @@ public class ClanPanel : MonoBehaviour
 		Action join = () => {
 			Debug.Log("[ClanPanel] Join new clan");
 			currentChannel.JoinAsMemberAsync().ContinueWith(
-				tt => Task.Delay(1000)
+				tt => {
+					joinButton.gameObject.SetActive(false);
+					leaveButton.gameObject.SetActive(true);
+					return Task.Delay(1000);
+				}
 			).ContinueWith(
 				tt => {
 					CurrentPlayerCache.CurrentClan = currentChannel;
@@ -258,6 +262,9 @@ public class ClanPanel : MonoBehaviour
 			}
 			else
 			{
+				joinButton.gameObject.SetActive(true);
+				leaveButton.gameObject.SetActive(false);
+
 				Debug.Log("[ClanPanel] Left clan");
 				CurrentPlayerCache.CurrentClan = null;
 				t.ContinueWith(tt => ClanInfoUpdate(id));

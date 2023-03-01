@@ -58,12 +58,26 @@ public class MessageReaction : MonoBehaviour
 		if(msg.ReactionScores.TryGetValue(reactionID, out int temp))
 			Count = temp;
 
-		msg.ReactionAdded += OnReactionAdded;
-		msg.ReactionRemoved += OnReactionRemoved;
+		//msg.ReactionAdded += OnReactionAdded;
+		//msg.ReactionRemoved += OnReactionRemoved;
+		msg.ReactionUpdated += OnReactionUpdated;
 
 		button.onClick.AddListener(SendAddReaction);
 
 		return true;
+	}
+
+	private void OnReactionUpdated(
+		IStreamChannel channel, IStreamMessage message, StreamReaction reaction
+	)
+	{
+		if(message.Id != msg.Id
+		|| reaction.Type != Icon.name
+		)
+			return;
+
+		if(reaction.Score != null)
+			Count = reaction.Score.Value;
 	}
 
 	private void SendAddReaction()
@@ -73,29 +87,29 @@ public class MessageReaction : MonoBehaviour
 		);
 	}
 
-	private void OnReactionAdded(
-		IStreamChannel channel, IStreamMessage message, StreamReaction reaction
-	)
-	{
-		if(message.Id != msg.Id
-		|| reaction.Type != Icon.name
-		)
-			return;
-
-		++Count;
-	}
-
-	private void OnReactionRemoved(
-		IStreamChannel channel, IStreamMessage message, StreamReaction reaction
-	)
-	{
-		if(message.Id != msg.Id
-		|| reaction.Type != Icon.name
-		)
-			return;
-
-		--Count;
-	}
+	//private void OnReactionAdded(
+	//	IStreamChannel channel, IStreamMessage message, StreamReaction reaction
+	//)
+	//{
+	//	if(message.Id != msg.Id
+	//	|| reaction.Type != Icon.name
+	//	)
+	//		return;
+	//
+	//	++Count;
+	//}
+	//
+	//private void OnReactionRemoved(
+	//	IStreamChannel channel, IStreamMessage message, StreamReaction reaction
+	//)
+	//{
+	//	if(message.Id != msg.Id
+	//	|| reaction.Type != Icon.name
+	//	)
+	//		return;
+	//
+	//	--Count;
+	//}
 
 	public void Show()
 	{
