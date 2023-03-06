@@ -59,7 +59,7 @@ public class MessageReaction : MonoBehaviour
 			Count = temp;
 
 		//msg.ReactionAdded += OnReactionAdded;
-		//msg.ReactionRemoved += OnReactionRemoved;
+		msg.ReactionRemoved += OnReactionRemoved;
 		msg.ReactionUpdated += OnReactionUpdated;
 
 		button.onClick.AddListener(SendAddReaction);
@@ -99,17 +99,17 @@ public class MessageReaction : MonoBehaviour
 	//	++Count;
 	//}
 	//
-	//private void OnReactionRemoved(
-	//	IStreamChannel channel, IStreamMessage message, StreamReaction reaction
-	//)
-	//{
-	//	if(message.Id != msg.Id
-	//	|| reaction.Type != Icon.name
-	//	)
-	//		return;
-	//
-	//	--Count;
-	//}
+	private void OnReactionRemoved(
+		IStreamChannel channel, IStreamMessage message, StreamReaction reaction
+	)
+	{
+		if(message.Id != msg.Id
+		|| reaction.Type != Icon.name
+		)
+			return;
+	
+		--Count;
+	}
 
 	public void Show()
 	{

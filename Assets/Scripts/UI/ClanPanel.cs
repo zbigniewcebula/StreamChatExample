@@ -1,4 +1,5 @@
 using StreamChat.Core;
+using StreamChat.Core.Requests;
 using StreamChat.Core.StatefulModels;
 using System;
 using System.Collections;
@@ -30,7 +31,12 @@ public class ClanPanel : MonoBehaviour
 	[SerializeField] private Button joinButton = null;
 	[SerializeField] private Button leaveButton = null;
 
-	[Header("Bindings/Clan Info")]
+	[Header("Bindings/Dialog")]
+	[SerializeField] private GameObject leaveDialog = null;
+	[SerializeField] private Button cancelLeaveButton = null;
+	[SerializeField] private Button leaveConfirmationButton = null;
+
+	[Header("Bindings/Members")]
 	[SerializeField] private RectTransform memberListParent = null;
 
 	[Header("Bindings/Prefabs")]
@@ -53,8 +59,13 @@ public class ClanPanel : MonoBehaviour
 			state => ClanInfoUpdate(state.Id)
 		);
 
+		leaveDialog.SetActive(false);
+
 		joinButton.onClick.AddListener(JoinButtonClicked);
-		leaveButton.onClick.AddListener(LeaveButtonClicked);
+		leaveButton.onClick.AddListener(() => leaveDialog.SetActive(true));
+
+		cancelLeaveButton.onClick.AddListener(() => leaveDialog.SetActive(false));
+		leaveConfirmationButton.onClick.AddListener(LeaveButtonClicked);
 	}
 
 	private void OnMembersChanged(IStreamChannel chn, IStreamChannelMember member)
@@ -209,12 +220,14 @@ public class ClanPanel : MonoBehaviour
 
 	private void JoinButtonClicked()
 	{
+		//Send message
+		//Send join request
+		//Update clan info
 		Action join = () => {
 			Debug.Log("[ClanPanel] Join new clan");
 			currentChannel.JoinAsMemberAsync().ContinueWith(
 				tt => {
-					joinButton.gameObject.SetActive(false);
-					leaveButton.gameObject.SetActive(true);
+					ButtonsRefresh();
 					return Task.Delay(1000);
 				}
 			).ContinueWith(
@@ -225,67 +238,95 @@ public class ClanPanel : MonoBehaviour
 			);
 		};
 
-		if(CurrentPlayerCache.CurrentClan == null)
-		{
-			join.Invoke();
-			return;
-		}
-
-		string id = CurrentPlayerCache.CurrentClan.Id;
-		CurrentPlayerCache.CurrentClan.RemoveMembersAsync(
-			new string[] { StreamManager.Client.LocalUserData.UserId }
-		).ContinueWith(t => {
-			if(t.IsFaulted)
+		SendSpecialMessage(currentChannel, true).ContinueWith(_t => {
+			if(_t.IsFaulted)
 			{
-				Debug.LogError("[ClanPanel] Failed to change the clan");
-				if(t.Exception != null)
-					Debug.LogException(t.Exception);
+				Debug.LogError(
+					$"[ClanPanel] Failed to join the clan! Reason: {_t.Exception.Message}"
+				);
+				return;
 			}
-			else
+
+			if(CurrentPlayerCache.CurrentClan == null)
 			{
 				join.Invoke();
+				return;
 			}
+
+			string id = CurrentPlayerCache.CurrentClan.Id;
+			CurrentPlayerCache.CurrentClan.RemoveMembersAsync(
+				new string[] { StreamManager.Client.LocalUserData.UserId }
+			).ContinueWith(t => {
+				if(t.IsFaulted)
+				{
+					Debug.LogError("[ClanPanel] Failed to join the clan");
+					if(t.Exception != null)
+						Debug.LogException(t.Exception);
+				}
+				else
+				{
+					join.Invoke();
+				}
+			});
 		});
 	}
 
 	private void LeaveButtonClicked()
 	{
+		leaveDialog.SetActive(false);
+
+		//Send message
+		//Send leave request
+		//Update clan info
 		string id = CurrentPlayerCache.CurrentClan.Id;
-		CurrentPlayerCache.CurrentClan.RemoveMembersAsync(
-			new string[] { StreamManager.Client.LocalUserData.UserId }
-		).ContinueWith(t => {
-			if(t.IsFaulted)
+		SendSpecialMessage(currentChannel, false).ContinueWith(_t => {
+			if(_t.IsFaulted)
 			{
-				Debug.LogError("[ClanPanel] Failed to leave clan");
-				if(t.Exception != null)
-					Debug.LogException(t.Exception);
+				Debug.LogError("[ClanPanel] Failed to leave the clan!");
+				return;
 			}
-			else
-			{
-				joinButton.gameObject.SetActive(true);
-				leaveButton.gameObject.SetActive(false);
 
-				Debug.Log("[ClanPanel] Left clan");
-				CurrentPlayerCache.CurrentClan = null;
-				t.ContinueWith(tt => ClanInfoUpdate(id));
-			}
+			CurrentPlayerCache.CurrentClan.RemoveMembersAsync(
+				new string[] { StreamManager.Client.LocalUserData.UserId }
+			).ContinueWith(t => {
+				if(t.IsFaulted)
+				{
+					Debug.LogError("[ClanPanel] Failed to leave clan");
+					if(t.Exception != null)
+						Debug.LogException(t.Exception);
+				}
+				else
+				{
+					ButtonsRefresh();
+
+					Debug.Log("[ClanPanel] Left clan");
+					CurrentPlayerCache.CurrentClan = null;
+					t.ContinueWith(tt => ClanInfoUpdate(id));
+				}
+			});
 		});
-		/*
-		var user = CurrentPlayerCache.CurrentClan.Members.FirstOrDefault(
-			m => m.User.Id == StreamManager.Client.LocalUserData.UserId
-		);
-		if(user != null)
-		{
-			Task task = CurrentPlayerCache.CurrentClan.RemoveMembersAsync(user);
-			task.ContinueWith(t => CurrentPlayerCache.FetchCurrentClanAsync(
-				state => ClanInfoUpdate(state.Id)
-			));
-			return;
-		}
+	}
 
-		var refreshTask = CurrentPlayerCache.FetchCurrentClanAsync(
-			state => ClanInfoUpdate(state.Id)
+	private void ButtonsRefresh()
+	{
+		joinButton.gameObject.SetActive(CurrentPlayerCache.CurrentClan == null);
+		leaveButton.gameObject.SetActive(CurrentPlayerCache.CurrentClan != null);
+	}
+
+	private async Task SendSpecialMessage(IStreamChannel channel, bool join = true)
+	{
+		var response = await channel.SendNewMessageAsync(
+			new StreamSendMessageRequest()
+			{
+				ShowInChannel = false,
+				MentionedUsers = new List<IStreamUser>() {
+					StreamManager.Client.LocalUserData.User
+				},
+				CustomData = new StreamCustomDataRequest()
+				{
+					{ "special", join? "join": "leave" }
+				}
+			}
 		);
-		*/
 	}
 }

@@ -28,6 +28,7 @@ public class ChatPanel : MonoBehaviour
 	[Header("Bindings/Prefabs")]
 	[SerializeField] private GameObject currentUserMessageEntryPrefab = null;
 	[SerializeField] private GameObject messageEntryPrefab = null;
+	[SerializeField] private MemberActivityMessageEntry memberActivityEntryPrefab = null;
 
 	//Events
 
@@ -77,6 +78,20 @@ public class ChatPanel : MonoBehaviour
 
 	private void OnNewMessageAdded(IStreamChannel channel, IStreamMessage msg)
 	{
+		if(msg.MentionedUsers.Count == 1
+			&& msg.CustomData.TryGet("special", out string type)
+			)
+		{
+			var entry = Instantiate(
+				memberActivityEntryPrefab, messagesBoxParent
+			);
+			if(type == "join")
+				entry.SetJoin(msg.MentionedUsers[0].Id);
+			else if(type == "leave")
+				entry.SetLeft(msg.MentionedUsers[0].Id);
+			return;
+		}
+
 		var box = Instantiate(
 			msg.User.Id == StreamManager.Client.LocalUserData.UserId ?
 			currentUserMessageEntryPrefab : messageEntryPrefab,

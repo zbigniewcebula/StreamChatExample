@@ -49,6 +49,10 @@ public class ClanEntry : MonoBehaviour
 
 	public void Refresh()
 	{
+		//Unity Null protection
+		if(gameObject == null || gameObject.Equals(null))
+			return;
+
 		nameLabel.text = Channel.CustomData.Get<string>("clanname");
 		score.text = Channel.CustomData.Get<int>("score").ToString();
 		try
