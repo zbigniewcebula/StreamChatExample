@@ -595,6 +595,7 @@ GameObject:
   - component: {fileID: 100949215}
   - component: {fileID: 100949214}
   - component: {fileID: 100949216}
+  - component: {fileID: 100949217}
   m_Layer: 0
   m_Name: StreamManager
   m_TagString: Untagged
@@ -645,6 +646,18 @@ MonoBehaviour:
   generateClanChannels: 0
   deleteClanChannels: 0
   generateUsers: 0
+--- !u!114 &100949217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100949213}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0af3ca958a1ea9d43b120b9a76f482e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &103130299
 GameObject:
   m_ObjectHideFlags: 0
