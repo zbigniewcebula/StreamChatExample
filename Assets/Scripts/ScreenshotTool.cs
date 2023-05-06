@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -34,6 +32,7 @@ public class ScreenshotTool : MonoBehaviour
 			);
 
 			ScreenCapture.CaptureScreenshot(filename);
+			Debug.Log($"[ScrrenshotTool] Screenshot saved: {filename}");
 		}
 	}
 }
