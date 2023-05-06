@@ -4,6 +4,7 @@ using StreamChat.Core.StatefulModels;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Channels;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -65,8 +66,8 @@ public class ClanEntry : MonoBehaviour
 			Debug.LogException(ex);
 		}
 		int memOnline = Channel.Members == null ? 0 : Channel.Members.Count;
-		int memCount = Channel.CustomData.Get<int>("membersCount");
-		membersCount.text = $"Online: {memOnline}/{memCount}";
+		int memberMax = Channel.CustomData.Get<int>("membersCount");
+		membersCount.text = $"Online: {memOnline}/{Channel.MemberCount} ({memberMax})";
 	}
 
 	private void InternalRefresh(IStreamChannel channel)

@@ -79,8 +79,8 @@ public class ChatPanel : MonoBehaviour
 	private void OnNewMessageAdded(IStreamChannel channel, IStreamMessage msg)
 	{
 		if(msg.MentionedUsers.Count == 1
-			&& msg.CustomData.TryGet("special", out string type)
-			)
+		&& msg.CustomData.TryGet("special", out string type)
+		)
 		{
 			var entry = Instantiate(
 				memberActivityEntryPrefab, messagesBoxParent

@@ -1,4 +1,5 @@
 using StreamChat.Core;
+using StreamChat.Core.LowLevelClient.Models;
 using StreamChat.Core.Requests;
 using StreamChat.Core.StatefulModels;
 using System;
@@ -177,7 +178,8 @@ public class ClanPanel : MonoBehaviour
 			0 : membersList.Where(
 				m => m.User != null && m.User.Online
 			).Count();
-		members.text = $"{membersOnline}/{channel.MemberCount}";
+		int memberMax = channel.CustomData.Get<int>("membersCount");
+		members.text = $"{membersOnline}/{channel.MemberCount} ({memberMax})";
 
 		if(membersList.Any(m =>
 				m.User.Id == StreamManager.Client.LocalUserData.UserId

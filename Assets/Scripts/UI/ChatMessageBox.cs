@@ -10,6 +10,7 @@ using UnityEngine.EventSystems;
 public class ChatMessageBox : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
 	//Static
+	private static ReactionsDB reactionsDB = null;
 
 	//Accessor
 	public string Author
@@ -50,7 +51,6 @@ public class ChatMessageBox : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 	[SerializeField] private Text rank = null;
 	[SerializeField] private RectTransform reactionsParent = null;
 	[SerializeField] private MessageReaction reactionPrefab = null;
-	[SerializeField] private ReactionsDB reactionsDB = null;
 
 	[Header("Settings"), Tooltip("Time in seconds")]
 	[SerializeField] private float refreshInterval = 60f;
@@ -65,6 +65,11 @@ public class ChatMessageBox : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 	private Dictionary<string, MessageReaction> reactions = new();
 
 	//Methods
+	private void Awake()
+	{
+		if(reactionsDB == null)
+			reactionsDB = Resources.Load<ReactionsDB>("ReactionsDB");
+	}
 	private void Start()
 	{
 		for(int i = 0; i < reactionsDB.Count; ++i)
